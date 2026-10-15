@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 const loanRate = 0.05; // ponytail: example fixed rate, real offers vary.
 const savingsRate = 0.04; // Example savings account rate, compounded monthly.
 
-// Chart series colors, validated for CVD separation and contrast on white.
+// Chart series colors, validated for CVD separation and contrast on the dark panel.
 const loanColor = Color(0xFF0083A0);
 const saveColor = Color(0xFFE54F1B);
-const comboColor = Color(0xFF6B4FA0);
-const ink = Color(0xFF2B2D33);
-const muted = Color(0xFF55575C);
+const comboColor = Color(0xFF9C7FD6);
+const ink = Color(0xFFF1EDE6);
+const muted = Color(0xFFB4B6BB);
+const panel = Color(0xFF2B2D33);
+const raised = Color(0xFF3A3D44);
 
 /// Monthly annuity instalment for [principal] at [rate] p.a. over [months].
 double monthlyPayment(double principal, double rate, int months) {
@@ -143,7 +145,7 @@ class _PlanDialogState extends State<PlanDialog> {
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: panel,
       insetPadding: EdgeInsets.symmetric(
         horizontal: screenWidth * 0.025,
         vertical: 24,
@@ -389,7 +391,7 @@ class OptionCard extends StatelessWidget {
       width: 370,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F6F2),
+        color: raised,
         borderRadius: BorderRadius.circular(12),
         border: Border(left: BorderSide(color: color, width: 6)),
       ),
@@ -516,7 +518,7 @@ class _Tooltip extends StatelessWidget {
       width: 240,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: raised,
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [BoxShadow(blurRadius: 8, color: Color(0x33000000))],
       ),
@@ -563,7 +565,7 @@ class _ChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final grid = Paint()
-      ..color = const Color(0xFFE9EAEA)
+      ..color = const Color(0xFF44474E)
       ..strokeWidth = 1;
     // Horizontal grid + EUR labels.
     for (var i = 0; i <= 4; i++) {
@@ -600,7 +602,7 @@ class _ChartPainter extends CustomPainter {
       );
       for (final s in series) {
         final p = Offset(x, yOf(valueAt(s.values, h), size));
-        canvas.drawCircle(p, 6, Paint()..color = Colors.white);
+        canvas.drawCircle(p, 6, Paint()..color = panel);
         canvas.drawCircle(p, 4.5, Paint()..color = s.color);
       }
     }

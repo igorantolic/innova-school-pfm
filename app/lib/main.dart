@@ -6,8 +6,11 @@ import 'plan.dart';
 const rbaYellow = Color(0xFFFEE600);
 const rbaDark = Color(0xFF2B2D33);
 const rbaTeal = Color(0xFF037080);
-const rbaBeige = Color(0xFFF1EDE6);
-const rbaGray = Color(0xFF55575C);
+// Dark theme (default): page, panels and text on them.
+const rbaBg = Color(0xFF1E1F23);
+const rbaInk = Color(0xFFF1EDE6);
+const rbaMuted = Color(0xFFB4B6BB);
+const rbaTealLight = Color(0xFF4FB8C6);
 
 void main() => runApp(const App());
 
@@ -21,16 +24,19 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
+          brightness: Brightness.dark,
           seedColor: rbaYellow,
-          primary: rbaDark,
-          secondary: rbaTeal,
-          surface: Colors.white,
+          primary: rbaYellow,
+          onPrimary: rbaDark,
+          secondary: rbaTealLight,
+          surface: rbaDark,
+          onSurface: rbaInk,
         ),
-        scaffoldBackgroundColor: rbaBeige,
+        scaffoldBackgroundColor: rbaBg,
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: rbaBg,
         ),
       ),
       home: const MainPage(),
@@ -273,18 +279,21 @@ class _MainPageState extends State<MainPage> {
         children: [
           Text(
             'What would you like to achieve?',
+            textAlign: TextAlign.center,
             style: textTheme.displaySmall?.copyWith(
-              color: rbaDark,
+              color: rbaInk,
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Choose your goal and we will help you get there.',
-            style: textTheme.titleLarge?.copyWith(color: rbaGray),
+            textAlign: TextAlign.center,
+            style: textTheme.titleLarge?.copyWith(color: rbaMuted),
           ),
           const SizedBox(height: 32),
           Wrap(
+            alignment: WrapAlignment.center,
             spacing: 24,
             runSpacing: 24,
             children: [
@@ -300,12 +309,11 @@ class _MainPageState extends State<MainPage> {
           ),
           if (goal != null) ...[
             const SizedBox(height: 32),
-            Align(
-              alignment: Alignment.centerLeft,
+            Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 700),
                 child: Card(
-                  color: Colors.white,
+                  color: rbaDark,
                   clipBehavior: Clip.antiAlias,
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -319,7 +327,7 @@ class _MainPageState extends State<MainPage> {
                           Text(
                             goal.title,
                             style: textTheme.headlineMedium?.copyWith(
-                              color: rbaTeal,
+                              color: rbaTealLight,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -330,13 +338,13 @@ class _MainPageState extends State<MainPage> {
                               shape: const Border(),
                               leading: const Icon(
                                 Icons.info_outline,
-                                color: rbaTeal,
+                                color: rbaTealLight,
                               ),
                               title: Text(
                                 title,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: rbaDark,
+                                  color: rbaInk,
                                 ),
                               ),
                               expandedAlignment: Alignment.centerLeft,
@@ -347,7 +355,7 @@ class _MainPageState extends State<MainPage> {
                               children: [
                                 Text(
                                   body,
-                                  style: const TextStyle(color: rbaGray),
+                                  style: const TextStyle(color: rbaMuted),
                                 ),
                               ],
                             ),
@@ -355,7 +363,7 @@ class _MainPageState extends State<MainPage> {
                           Text(
                             'Tell us more',
                             style: textTheme.titleLarge?.copyWith(
-                              color: rbaDark,
+                              color: rbaInk,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
