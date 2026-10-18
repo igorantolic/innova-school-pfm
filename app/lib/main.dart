@@ -33,231 +33,155 @@ class App extends StatelessWidget {
           onSurface: rbaInk,
         ),
         scaffoldBackgroundColor: rbaBg,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          filled: true,
-          fillColor: rbaBg,
-        ),
       ),
       home: const MainPage(),
     );
   }
 }
 
-/// A detail question: free text/number, or a choice when [options] is set.
-/// [initial] prefills the field.
-typedef Question = ({
-  String label,
-  bool number,
-  List<String>? options,
-  String? initial,
-});
-
-Question text(String label, {String? initial}) =>
-    (label: label, number: false, options: null, initial: initial);
-Question number(String label, {String? initial}) =>
-    (label: label, number: true, options: null, initial: initial);
-Question choice(String label, List<String> options, {String? initial}) =>
-    (label: label, number: false, options: options, initial: initial);
-
-const when = ['Within 3 months', '3 – 12 months', 'More than a year'];
-
-final goals =
-    <
-      ({
-        String title,
-        String cost,
-        String? own,
-        List<int> years,
-        Insurance? insurance,
-        IconData icon,
-        Motion motion,
-        List<(String, String)> info,
-        List<Question> questions,
-      })
-    >[
+final goals = <Goal>[
+  (
+    title: 'Car',
+    icon: Icons.directions_car_rounded,
+    motion: drive,
+    costLabel: 'Total price',
+    ownLabel: 'Saved for the down payment',
+    cost: 25000,
+    maxCost: 100000,
+    step: 500,
+    own: 2500,
+    budget: 300,
+    years: (min: 1, initial: 5, max: 8),
+    insurance: (
+      name: 'Car insurance',
+      monthly: 50,
+      covers:
+          'Comprehensive cover for damage and theft, on top of the '
+          'mandatory liability policy.',
+    ),
+    info: [
       (
-        title: 'New car',
-        cost: 'Approximate price (EUR)',
-        own: 'Down payment (EUR)',
-        years: [3, 5, 7],
-        insurance: (
-          name: 'Car insurance',
-          monthly: 50,
-          covers:
-              'Comprehensive cover for damage and theft, on top of the '
-              'mandatory liability policy.',
-        ),
-        icon: Icons.directions_car_rounded,
-        motion: drive,
-        info: [
-          (
-            'Financing options',
-            'Pay from savings, take a car loan or lease. With a loan the car '
-                'is yours from day one; leasing usually means lower monthly '
-                'payments.',
-          ),
-          (
-            'What you will need',
-            'ID, proof of income (recent payslips) and the seller\'s offer '
-                'or pro-forma invoice.',
-          ),
-          (
-            'Running costs',
-            'Plan for registration, insurance, servicing and fuel on top of '
-                'the purchase price.',
-          ),
-        ],
-        questions: [
-          choice('New or used?', ['New', 'Used'], initial: 'New'),
-          number('Approximate price (EUR)', initial: '25000'),
-          number('Down payment (EUR)', initial: '2500'),
-          choice('When do you plan to buy?', when, initial: when[1]),
-        ],
+        'Financing options',
+        'Pay from savings, take a car loan or lease. With a loan the car '
+            'is yours from day one; leasing usually means lower monthly '
+            'payments.',
       ),
       (
-        title: 'House or flat',
-        cost: 'Approximate price (EUR)',
-        own: 'Down payment (EUR)',
-        years: [10, 20, 30],
-        insurance: (
-          name: 'Home insurance',
-          monthly: 15,
-          covers:
-              'Covers the property against fire, flood and burglary. Banks '
-              'usually require it for a housing loan.',
-        ),
-        icon: Icons.home_rounded,
-        motion: pulse,
-        info: [
-          (
-            'Housing loan basics',
-            'Most buyers combine savings for the down payment with a '
-                'long-term housing loan. A bigger down payment means lower '
-                'monthly instalments.',
-          ),
-          (
-            'What you will need',
-            'ID, proof of income, a land registry extract for the property '
-                'and a property valuation.',
-          ),
-          (
-            'Extra costs',
-            'Budget for property transfer tax, notary and agency fees, and '
-                'moving in.',
-          ),
-        ],
-        questions: [
-          choice('Property type', ['House', 'Flat'], initial: 'Flat'),
-          text('Location (city)', initial: 'Zagreb'),
-          number('Approximate price (EUR)', initial: '180000'),
-          number('Down payment (EUR)', initial: '36000'),
-          choice('When do you plan to buy?', when, initial: when[2]),
-        ],
+        'What you will need',
+        'ID, proof of income (recent payslips) and the seller\'s offer '
+            'or pro-forma invoice.',
       ),
       (
-        title: 'Holiday',
-        cost: 'Budget (EUR)',
-        own: null,
-        years: [1, 2, 3],
-        insurance: (
-          name: 'Travel insurance',
-          monthly: 5,
-          covers:
-              'Annual policy for medical costs abroad, cancellations and '
-              'lost luggage.',
-        ),
-        icon: Icons.beach_access_rounded,
-        motion: sway,
-        info: [
-          (
-            'Save or borrow?',
-            'Saving a little each month avoids interest. For bigger trips a '
-                'small cash loan or card instalments can spread the cost.',
-          ),
-          (
-            'Travel smart',
-            'Book early, get travel insurance and keep a reserve for '
-                'unexpected costs on the trip.',
-          ),
-        ],
-        questions: [
-          text('Destination', initial: 'Lisbon'),
-          number('Number of people', initial: '2'),
-          number('Budget (EUR)', initial: '3000'),
-          choice('When are you travelling?', when, initial: when[1]),
-        ],
+        'Running costs',
+        'Plan for registration, insurance, servicing and fuel on top of '
+            'the purchase price.',
+      ),
+    ],
+  ),
+  (
+    title: 'House or flat',
+    icon: Icons.home_rounded,
+    motion: pulse,
+    costLabel: 'Total price',
+    ownLabel: 'Saved for the down payment',
+    cost: 180000,
+    maxCost: 1000000,
+    step: 5000,
+    own: 35000,
+    budget: 800,
+    years: (min: 5, initial: 25, max: 30),
+    insurance: (
+      name: 'Home insurance',
+      monthly: 15,
+      covers:
+          'Covers the property against fire, flood and burglary. Banks '
+          'usually require it for a housing loan.',
+    ),
+    info: [
+      (
+        'Housing loan basics',
+        'Most buyers combine savings for the down payment with a '
+            'long-term housing loan. A bigger down payment means lower '
+            'monthly instalments.',
       ),
       (
-        title: 'Major life event',
-        cost: 'Estimated cost (EUR)',
-        own: 'Savings so far (EUR)',
-        years: [2, 3, 5],
-        insurance: null,
-        icon: Icons.celebration_rounded,
-        motion: hop,
-        info: [
-          (
-            'Plan ahead',
-            'Weddings, a new baby or education come with big costs. Starting '
-                'early gives you more freedom and less stress.',
-          ),
-          (
-            'Ways to fund it',
-            'Combine a savings plan, a cash loan and insurance to cover the '
-                'event without draining your reserves.',
-          ),
-        ],
-        questions: [
-          choice('What is the event?', [
-            'Wedding',
-            'New baby',
-            'Education',
-            'Other',
-          ], initial: 'Wedding'),
-          number('Estimated cost (EUR)', initial: '15000'),
-          number('Savings so far (EUR)', initial: '3000'),
-          choice('When is it?', when, initial: when[2]),
-        ],
+        'What you will need',
+        'ID, proof of income, a land registry extract for the property '
+            'and a property valuation.',
       ),
-    ];
+      (
+        'Extra costs',
+        'Budget for property transfer tax, notary and agency fees, and '
+            'moving in.',
+      ),
+    ],
+  ),
+  (
+    title: 'Holiday',
+    icon: Icons.beach_access_rounded,
+    motion: sway,
+    costLabel: 'Budget',
+    ownLabel: 'Already saved',
+    cost: 3000,
+    maxCost: 20000,
+    step: 100,
+    own: 0,
+    budget: 200,
+    years: (min: 1, initial: 1, max: 3),
+    insurance: (
+      name: 'Travel insurance',
+      monthly: 5,
+      covers:
+          'Annual policy for medical costs abroad, cancellations and '
+          'lost luggage.',
+    ),
+    info: [
+      (
+        'Save or borrow?',
+        'Saving a little each month avoids interest. For bigger trips a '
+            'small cash loan or card instalments can spread the cost.',
+      ),
+      (
+        'Travel smart',
+        'Book early, get travel insurance and keep a reserve for '
+            'unexpected costs on the trip.',
+      ),
+    ],
+  ),
+  (
+    title: 'Major life event',
+    icon: Icons.celebration_rounded,
+    motion: hop,
+    costLabel: 'Estimated cost',
+    ownLabel: 'Savings so far',
+    cost: 15000,
+    maxCost: 100000,
+    step: 500,
+    own: 3000,
+    budget: 400,
+    years: (min: 1, initial: 3, max: 5),
+    insurance: null,
+    info: [
+      (
+        'Plan ahead',
+        'Weddings, a new baby or education come with big costs. Starting '
+            'early gives you more freedom and less stress.',
+      ),
+      (
+        'Ways to fund it',
+        'Combine a savings plan, a cash loan and insurance to cover the '
+            'event without draining your reserves.',
+      ),
+    ],
+  ),
+];
 
-class MainPage extends StatefulWidget {
+class MainPage extends StatelessWidget {
   const MainPage({super.key});
-
-  @override
-  State<MainPage> createState() => _MainPageState();
-}
-
-class _MainPageState extends State<MainPage> {
-  int? selected;
-  final formKey = GlobalKey<FormState>();
-  final answers = <String, String>{};
-
-  void select(int i) => setState(() {
-    selected = i;
-    answers.clear();
-  });
-
-  void plan() {
-    if (!formKey.currentState!.validate()) return;
-    formKey.currentState!.save();
-    final goal = goals[selected!];
-    final own = goal.own;
-    showPlan(
-      context,
-      goal: goal.title,
-      cost: double.parse(answers[goal.cost]!),
-      own: own == null ? 0 : double.parse(answers[own]!),
-      years: goal.years,
-      insurance: goal.insurance,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final goal = selected == null ? null : goals[selected!];
     return Scaffold(
       appBar: AppBar(
         backgroundColor: rbaYellow,
@@ -297,117 +221,20 @@ class _MainPageState extends State<MainPage> {
             spacing: 24,
             runSpacing: 24,
             children: [
-              for (var i = 0; i < goals.length; i++)
+              for (final g in goals)
                 GoalCard(
-                  title: goals[i].title,
-                  icon: goals[i].icon,
-                  motion: goals[i].motion,
-                  selected: selected == i,
-                  onTap: () => select(i),
+                  title: g.title,
+                  icon: g.icon,
+                  motion: g.motion,
+                  onTap: () => showPlan(context, g),
                 ),
             ],
           ),
-          if (goal != null) ...[
-            const SizedBox(height: 32),
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 700),
-                child: Card(
-                  color: rbaDark,
-                  clipBehavior: Clip.antiAlias,
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: formKey,
-                      child: Column(
-                        // New key per goal resets the fields when switching.
-                        key: ValueKey(selected),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            goal.title,
-                            style: textTheme.headlineMedium?.copyWith(
-                              color: rbaTealLight,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          for (final (title, body) in goal.info)
-                            ExpansionTile(
-                              tilePadding: EdgeInsets.zero,
-                              shape: const Border(),
-                              leading: const Icon(
-                                Icons.info_outline,
-                                color: rbaTealLight,
-                              ),
-                              title: Text(
-                                title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: rbaInk,
-                                ),
-                              ),
-                              expandedAlignment: Alignment.centerLeft,
-                              childrenPadding: const EdgeInsets.only(
-                                left: 40,
-                                bottom: 12,
-                              ),
-                              children: [
-                                Text(
-                                  body,
-                                  style: const TextStyle(color: rbaMuted),
-                                ),
-                              ],
-                            ),
-                          const Divider(height: 32),
-                          Text(
-                            'Tell us more',
-                            style: textTheme.titleLarge?.copyWith(
-                              color: rbaInk,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          for (final q in goal.questions) ...[
-                            QuestionField(
-                              question: q,
-                              onSaved: (v) => answers[q.label] = v ?? '',
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: rbaYellow,
-                              foregroundColor: rbaDark,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 18,
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            onPressed: plan,
-                            icon: const Icon(Icons.auto_awesome),
-                            label: const Text('Help me plan this'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
-
-/// Moves a tile's picture for animation progress [t] (0 → 1 → 0, eased).
-typedef Motion = Widget Function(double t, Widget child);
 
 Widget drive(double t, Widget child) =>
     Transform.translate(offset: Offset((t - 0.5) * 60, 0), child: child);
@@ -427,14 +254,12 @@ class GoalCard extends StatefulWidget {
     required this.title,
     required this.icon,
     required this.motion,
-    required this.selected,
     required this.onTap,
   });
 
   final String title;
   final IconData icon;
   final Motion motion;
-  final bool selected;
   final VoidCallback onTap;
 
   @override
@@ -468,20 +293,12 @@ class _GoalCardState extends State<GoalCard>
 
   @override
   Widget build(BuildContext context) {
-    final selected = widget.selected;
     return Semantics(
       button: true,
-      selected: selected,
       label: widget.title,
       child: Material(
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: selected ? rbaYellow : Colors.transparent,
-            width: 5,
-          ),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
           onTap: widget.onTap,
           child: Ink(
@@ -525,63 +342,11 @@ class _GoalCardState extends State<GoalCard>
                     ],
                   ),
                 ),
-                if (selected)
-                  const Positioned(
-                    top: 8,
-                    right: 8,
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: rbaYellow,
-                      child: Icon(Icons.check, color: rbaDark),
-                    ),
-                  ),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class QuestionField extends StatelessWidget {
-  const QuestionField({
-    super.key,
-    required this.question,
-    required this.onSaved,
-  });
-
-  final Question question;
-  final FormFieldSetter<String> onSaved;
-
-  @override
-  Widget build(BuildContext context) {
-    String? required(String? v) =>
-        (v == null || v.trim().isEmpty) ? 'Required' : null;
-    final decoration = InputDecoration(labelText: question.label);
-    final options = question.options;
-    if (options != null) {
-      return DropdownButtonFormField<String>(
-        decoration: decoration,
-        initialValue: question.initial,
-        items: [
-          for (final o in options) DropdownMenuItem(value: o, child: Text(o)),
-        ],
-        onChanged: (_) {},
-        validator: required,
-        onSaved: onSaved,
-      );
-    }
-    return TextFormField(
-      decoration: decoration,
-      initialValue: question.initial,
-      keyboardType: question.number ? TextInputType.number : TextInputType.text,
-      validator: question.number
-          ? (v) =>
-                required(v) ??
-                (num.tryParse(v!.trim()) == null ? 'Enter a number' : null)
-          : required,
-      onSaved: onSaved,
     );
   }
 }

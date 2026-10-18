@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 const loanRate = 0.05; // ponytail: example fixed rate, real offers vary.
 const savingsRate = 0.04; // Example savings account rate, compounded monthly.
 
-// Chart series colors, validated for CVD separation and contrast on the dark panel.
+// Option accent colors, validated for CVD separation and contrast on the dark panel.
 const loanColor = Color(0xFF0083A0);
 const saveColor = Color(0xFFE54F1B);
 const comboColor = Color(0xFF9C7FD6);
@@ -20,11 +20,10 @@ double monthlyPayment(double principal, double rate, int months) {
   return principal * r / (1 - pow(1 + r, -months));
 }
 
-/// Whole months needed to repay [principal] at [rate] p.a. paying [pay] a month.
-int monthsToRepay(double principal, double rate, double pay) {
+/// Largest loan that [pay] a month repays at [rate] p.a. over [months].
+double affordableLoan(double pay, double rate, int months) {
   final r = rate / 12;
-  // 1e-6 absorbs float noise so an exact 60.0000001 doesn't round up to 61.
-  return (-log(1 - principal * r / pay) / log(1 + r) - 1e-6).ceil();
+  return max(0, pay * (1 - pow(1 + r, -months)) / r);
 }
 
 /// Savings balance at the start of each month, depositing [pay] monthly at
@@ -41,18 +40,45 @@ List<double> savingsBalances(double target, double rate, double pay) {
 double savingsInterest(List<double> balances, double rate) =>
     rate / 12 * balances.take(balances.length - 1).fold(0.0, (a, b) => a + b);
 
-/// Remaining loan balance at the start of each month, 0..months.
-List<double> loanBalances(double principal, double rate, int months) {
-  final pay = monthlyPayment(principal, rate, months);
-  final out = [principal];
-  for (var m = 0; m < months; m++) {
-    out.add(max(0, out.last * (1 + rate / 12) - pay));
-  }
-  return out;
-}
+enum Pick { loan, save, combo }
+
+/// Saving when it takes at most 3 months or no loan fits [budget]; the loan
+/// when its instalment fits [budget]; otherwise save a deposit first, then
+/// borrow what [budget] can repay.
+Pick recommend({
+  required int saveMonths,
+  required double loanPay,
+  required double budget,
+}) => saveMonths <= 3
+    ? Pick.save
+    : loanPay <= budget
+    ? Pick.loan
+    : budget > 0
+    ? Pick.combo
+    : Pick.save;
 
 /// Optional insurance add-on for a goal; [monthly] is an example price.
 typedef Insurance = ({String name, double monthly, String covers});
+
+/// Moves a tile's picture for animation progress [t] (0 → 1 → 0, eased).
+typedef Motion = Widget Function(double t, Widget child);
+
+/// A goal to plan for. Amounts (EUR) and [years] are the sliders' start values.
+typedef Goal = ({
+  String title,
+  IconData icon,
+  Motion motion,
+  String costLabel,
+  String ownLabel,
+  double cost,
+  double maxCost,
+  double step,
+  double own,
+  double budget,
+  ({int min, int initial, int max}) years,
+  Insurance? insurance,
+  List<(String, String)> info,
+});
 
 String eur(num v) {
   final s = v.round().abs().toString();
@@ -71,77 +97,132 @@ String duration(int months) {
   ].join(' ');
 }
 
-Future<void> showPlan(
-  BuildContext context, {
-  required String goal,
-  required double cost,
-  required double own,
-  required List<int> years,
-  Insurance? insurance,
-}) => showDialog(
-  context: context,
-  builder: (_) => PlanDialog(
-    goal: goal,
-    cost: cost,
-    own: own,
-    years: years,
-    insurance: insurance,
-  ),
-);
+Future<void> showPlan(BuildContext context, Goal goal) =>
+    showDialog(context: context, builder: (_) => PlanDialog(goal: goal));
 
 class PlanDialog extends StatefulWidget {
-  const PlanDialog({
-    super.key,
-    required this.goal,
-    required this.cost,
-    required this.own,
-    required this.years,
-    this.insurance,
-  });
+  const PlanDialog({super.key, required this.goal});
 
-  final String goal;
-  final double cost;
-  final double own;
-  final List<int> years;
-  final Insurance? insurance;
+  final Goal goal;
 
   @override
   State<PlanDialog> createState() => _PlanDialogState();
 }
 
 class _PlanDialogState extends State<PlanDialog> {
-  late int years = widget.years[1];
-  double saveShare = 0.5;
+  late double cost = widget.goal.cost;
+  late double own = widget.goal.own;
+  late double budget = widget.goal.budget;
+  late int years = widget.goal.years.initial;
   bool insured = false;
 
   @override
   Widget build(BuildContext context) {
+    final g = widget.goal;
     final textTheme = Theme.of(context).textTheme;
-    final amount = widget.cost - widget.own;
+    final highlight = Theme.of(context).colorScheme.primary;
+    final amount = cost - own;
     final months = years * 12;
+    final ins = g.insurance;
+    // Insurance starts once you own it, so it shares the budget with the loan.
+    final loanBudget = budget - (insured ? ins!.monthly : 0);
     final pay = amount > 0 ? monthlyPayment(amount, loanRate, months) : 0.0;
     final interest = pay * months - amount;
-    final savings = savingsBalances(amount, savingsRate, pay);
+    final savings = savingsBalances(amount, savingsRate, budget);
     final saveMonths = savings.length - 1;
     final earned = savingsInterest(savings, savingsRate);
-    // Option 3: save part first with the same monthly amount, borrow the rest.
-    final saved = amount * saveShare;
-    final comboSavings = savingsBalances(saved, savingsRate, pay);
+    final pick = recommend(
+      saveMonths: saveMonths,
+      loanPay: pay,
+      budget: loanBudget,
+    );
+    // Deposit big enough that the rest is a loan repaid at loanBudget a month.
+    final comboLoan = affordableLoan(loanBudget, loanRate, months);
+    final deposit = amount - comboLoan;
+    final comboSavings = savingsBalances(deposit, savingsRate, budget);
     final comboSaveMonths = comboSavings.length - 1;
     final comboEarned = savingsInterest(comboSavings, savingsRate);
-    final ins = widget.insurance;
+    final comboInterest = loanBudget * months - comboLoan;
     String insLine(String from) =>
-        '+ ${eur(ins!.monthly)} / month '
-        '${ins.name.toLowerCase()} $from';
-    final comboLoan = amount - saved;
-    final comboLoanMonths = amount > 0
-        ? monthsToRepay(comboLoan, loanRate, pay)
-        : 0;
-    final comboInterest = amount > 0
-        ? monthlyPayment(comboLoan, loanRate, comboLoanMonths) *
-                  comboLoanMonths -
-              comboLoan
-        : 0.0;
+        '+ ${eur(ins!.monthly)} / month ${ins.name.toLowerCase()} $from';
+
+    final reason = switch (pick) {
+      Pick.save when saveMonths <= 3 =>
+        'Save first. Putting aside ${eur(budget)} a month, you will have '
+            '${eur(amount)} in ${duration(saveMonths)} – a short wait that '
+            'avoids loan interest.',
+      Pick.save =>
+        'Save first. Your monthly budget does not leave room for a loan '
+            'instalment, so put ${eur(budget)} a month aside – you will have '
+            '${eur(amount)} in ${duration(saveMonths)}.',
+      Pick.loan =>
+        'Take the loan. The ${eur(pay)} monthly instalment fits the '
+            '${eur(loanBudget)} you can spare, so you can buy now.',
+      Pick.combo =>
+        'Save a deposit first. A loan for the full ${eur(amount)} over '
+            '${duration(months)} costs ${eur(pay)} a month – more than the '
+            '${eur(loanBudget)} you can spare. Save ${eur(deposit)} in '
+            '${duration(comboSaveMonths)}, then borrow the rest at '
+            '${eur(loanBudget)} a month.',
+    };
+
+    final cards = {
+      Pick.loan: OptionCard(
+        color: loanColor,
+        title: 'Take a loan now',
+        headline: '${eur(pay)} / month',
+        description:
+            'Borrow ${eur(amount)} today and buy right away. You repay it in '
+            'equal monthly instalments over ${duration(months)}, and the bank '
+            'charges 5% a year on what you still owe.',
+        lines: [
+          'Total interest ${eur(interest)}',
+          'Total repaid ${eur(pay * months)}',
+          pay <= loanBudget
+              ? 'Leaves ${eur(loanBudget - pay)} of your monthly budget free'
+              : '${eur(pay - loanBudget)} a month over your budget',
+          if (insured) insLine('from day one'),
+        ],
+        recommended: pick == Pick.loan,
+      ),
+      Pick.save: OptionCard(
+        color: saveColor,
+        title: 'Save, then buy',
+        headline: '${eur(budget)} / month',
+        description:
+            'Put ${eur(budget)} aside each month in a savings account earning '
+            '4% a year. Once you have ${eur(amount)}, you buy outright – no '
+            'loan, no interest, nothing to repay. The trade-off is the wait.',
+        lines: [
+          'Ready in ${duration(saveMonths)}',
+          'Interest earned +${eur(earned)}',
+          'You keep ${eur(interest + earned)} compared to the loan',
+          if (insured) insLine('once you buy'),
+        ],
+        recommended: pick == Pick.save,
+      ),
+      if (pick == Pick.combo)
+        Pick.combo: OptionCard(
+          color: comboColor,
+          title: 'Save a deposit, then borrow',
+          headline: '${eur(budget)} / month',
+          description:
+              'Save ${eur(budget)} a month until you have a ${eur(deposit)} '
+              'deposit, then buy and borrow the remaining ${eur(comboLoan)}. '
+              'The loan is sized so its instalment is ${eur(loanBudget)} a '
+              'month – what you can afford – for ${duration(months)}.',
+          lines: [
+            'Deposit ready in ${duration(comboSaveMonths)}',
+            'You buy ${duration(saveMonths - comboSaveMonths)} sooner than '
+                'saving it all',
+            'All done in ${duration(comboSaveMonths + months)}',
+            'Interest earned +${eur(comboEarned)}, '
+                'paid ${eur(comboInterest)}',
+            if (insured) insLine('once you buy'),
+          ],
+          recommended: true,
+        ),
+    };
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     return Dialog(
@@ -161,7 +242,7 @@ class _PlanDialogState extends State<PlanDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Your ${widget.goal.toLowerCase()} plan',
+                      'Your ${g.title.toLowerCase()} plan',
                       style: textTheme.headlineMedium?.copyWith(
                         color: ink,
                         fontWeight: FontWeight.w800,
@@ -175,22 +256,87 @@ class _PlanDialogState extends State<PlanDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 32,
+                runSpacing: 8,
+                children: [
+                  AmountSlider(
+                    label: g.costLabel,
+                    value: cost,
+                    from: g.step,
+                    to: g.maxCost,
+                    step: g.step,
+                    onChanged: (v) => setState(() {
+                      cost = v;
+                      own = min(own, v);
+                    }),
+                  ),
+                  AmountSlider(
+                    label: g.ownLabel,
+                    value: own,
+                    from: 0,
+                    to: cost,
+                    step: g.step,
+                    onChanged: (v) => setState(() => own = v),
+                  ),
+                  AmountSlider(
+                    label: 'I can put aside each month',
+                    value: budget,
+                    from: 50,
+                    to: 3000,
+                    step: 50,
+                    onChanged: (v) => setState(() => budget = v),
+                  ),
+                  AmountSlider(
+                    label: 'Loan term',
+                    value: years.toDouble(),
+                    from: g.years.min.toDouble(),
+                    to: g.years.max.toDouble(),
+                    step: 1,
+                    format: (v) => duration(v.round() * 12),
+                    onChanged: (v) => setState(() => years = v.round()),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               Text(
-                widget.own > 0
+                own > 0
                     ? 'You need ${eur(amount)} '
-                          '(${eur(widget.cost)} minus your ${eur(widget.own)}).'
+                          '(${eur(cost)} minus your ${eur(own)}).'
                     : 'You need ${eur(amount)}.',
                 style: textTheme.titleMedium?.copyWith(color: muted),
               ),
               const SizedBox(height: 24),
               if (amount <= 0)
                 Text(
-                  'Your own funds already cover it – no loan or extra '
-                  'saving needed.',
+                  'Your savings already cover it – no loan or extra saving '
+                  'needed.',
                   style: textTheme.titleLarge?.copyWith(color: ink),
                 )
               else ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: raised,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: highlight, width: 2),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.lightbulb_outline, color: highlight),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          reason,
+                          style: textTheme.titleMedium?.copyWith(color: ink),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 if (ins != null) ...[
                   CheckboxListTile(
                     value: insured,
@@ -212,128 +358,12 @@ class _PlanDialogState extends State<PlanDialog> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                cardRow(
-                  [
-                    OptionCard(
-                      color: loanColor,
-                      title: 'Option 1 · Take a loan',
-                      subtitle: 'Fixed 5% p.a. on the remaining balance',
-                      headline: '${eur(pay)} / month',
-                      lines: [
-                        'Repaid in ${duration(months)}',
-                        'Total interest ${eur(interest)}',
-                        'Total repaid ${eur(pay * months)}',
-                        if (insured) insLine('from day one'),
-                      ],
-                      extra: Wrap(
-                        spacing: 8,
-                        children: [
-                          for (final y in widget.years)
-                            ChoiceChip(
-                              label: Text('$y ${y == 1 ? 'year' : 'years'}'),
-                              selected: y == years,
-                              onSelected: (_) => setState(() => years = y),
-                            ),
-                        ],
-                      ),
-                    ),
-                    OptionCard(
-                      color: saveColor,
-                      title: 'Option 2 · Save before you buy',
-                      subtitle: 'Same amount into a 4% p.a. savings account',
-                      headline: '${eur(pay)} / month',
-                      lines: [
-                        'Ready in ${duration(saveMonths)}',
-                        'Interest earned +${eur(earned)}',
-                        'You keep ${eur(interest + earned)} compared to the '
-                            'loan',
-                        if (insured) insLine('once you buy'),
-                      ],
-                    ),
-                    OptionCard(
-                      color: comboColor,
-                      title: 'Option 3 · Save some, borrow the rest',
-                      subtitle: 'Save first, then a smaller loan',
-                      headline: '${eur(pay)} / month',
-                      lines: [
-                        'Save ${eur(saved)} in ${duration(comboSaveMonths)}',
-                        'Then borrow ${eur(comboLoan)}, repaid in '
-                            '${duration(comboLoanMonths)}',
-                        'All done in '
-                            '${duration(comboSaveMonths + comboLoanMonths)}',
-                        'Interest earned +${eur(comboEarned)}, '
-                            'paid ${eur(comboInterest)}',
-                        'You keep '
-                            '${eur(interest - comboInterest + comboEarned)} '
-                            'compared to the loan',
-                        if (insured) insLine('once you buy'),
-                      ],
-                      extra: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Save first: ${(saveShare * 100).round()}%',
-                            style: const TextStyle(color: muted),
-                          ),
-                          Slider(
-                            value: saveShare,
-                            min: 0.1,
-                            max: 0.9,
-                            divisions: 8,
-                            activeColor: comboColor,
-                            label: '${(saveShare * 100).round()}%',
-                            onChanged: (v) => setState(() => saveShare = v),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  'Loan balance vs. savings over time',
-                  style: textTheme.titleLarge?.copyWith(
-                    color: ink,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Wrap(
-                  spacing: 24,
-                  runSpacing: 8,
-                  children: [
-                    LegendItem(color: loanColor, label: 'Option 1 · loan left'),
-                    LegendItem(color: saveColor, label: 'Option 2 · saved'),
-                    LegendItem(
-                      color: comboColor,
-                      label: 'Option 3 · saved, then loan left',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                PlanChart(
-                  series: [
-                    (
-                      label: 'Loan left',
-                      color: loanColor,
-                      values: loanBalances(amount, loanRate, months),
-                    ),
-                    (label: 'Saved', color: saveColor, values: savings),
-                    (
-                      label: 'Option 3',
-                      color: comboColor,
-                      // Climbs while saving, drops to the smaller loan at purchase.
-                      values: [
-                        ...comboSavings,
-                        ...loanBalances(
-                          comboLoan,
-                          loanRate,
-                          comboLoanMonths,
-                        ).skip(1),
-                      ],
-                    ),
-                  ],
-                ),
+                // Recommended option first.
+                cardRow([
+                  cards[pick]!,
+                  for (final e in cards.entries)
+                    if (e.key != pick) e.value,
+                ]),
                 const SizedBox(height: 12),
                 Text(
                   'Illustrative example only. Assumes a fixed 5% loan rate '
@@ -342,9 +372,98 @@ class _PlanDialogState extends State<PlanDialog> {
                   style: textTheme.bodySmall?.copyWith(color: muted),
                 ),
               ],
+              if (g.info.isNotEmpty) ...[
+                const Divider(height: 40),
+                Text(
+                  'Good to know',
+                  style: textTheme.titleLarge?.copyWith(
+                    color: ink,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                for (final (title, body) in g.info)
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    shape: const Border(),
+                    leading: Icon(
+                      Icons.info_outline,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                    title: Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: ink,
+                      ),
+                    ),
+                    expandedAlignment: Alignment.centerLeft,
+                    childrenPadding: const EdgeInsets.only(
+                      left: 40,
+                      bottom: 12,
+                    ),
+                    children: [
+                      Text(body, style: const TextStyle(color: muted)),
+                    ],
+                  ),
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Labelled slider snapping to [step], showing its value (EUR by default).
+class AmountSlider extends StatelessWidget {
+  const AmountSlider({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.from,
+    required this.to,
+    required this.step,
+    required this.onChanged,
+    this.format = eur,
+  });
+
+  final String label;
+  final double value, from, to, step;
+  final ValueChanged<double> onChanged;
+  final String Function(double) format;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 400,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(label, style: const TextStyle(color: muted)),
+              ),
+              Text(
+                format(value),
+                style: const TextStyle(
+                  color: ink,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: value,
+            min: from,
+            max: to,
+            divisions: max(1, ((to - from) / step).round()),
+            label: format(value),
+            semanticFormatterCallback: format,
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }
@@ -372,21 +491,22 @@ class OptionCard extends StatelessWidget {
     super.key,
     required this.color,
     required this.title,
-    required this.subtitle,
     required this.headline,
+    required this.description,
     required this.lines,
-    this.extra,
+    this.recommended = false,
   });
 
   final Color color;
   final String title;
-  final String subtitle;
   final String headline;
+  final String description;
   final List<String> lines;
-  final Widget? extra;
+  final bool recommended;
 
   @override
   Widget build(BuildContext context) {
+    final highlight = Theme.of(context).colorScheme.primary;
     return Container(
       width: 370,
       padding: const EdgeInsets.all(20),
@@ -398,6 +518,20 @@ class OptionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (recommended) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: highlight,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Recommended for you',
+                style: TextStyle(color: panel, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           Text(
             title,
             style: const TextStyle(
@@ -406,8 +540,7 @@ class OptionCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          Text(subtitle, style: const TextStyle(color: muted)),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             headline,
             style: const TextStyle(
@@ -417,236 +550,12 @@ class OptionCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          Text(description, style: const TextStyle(color: muted, height: 1.5)),
+          const SizedBox(height: 12),
           for (final l in lines)
             Text(l, style: const TextStyle(color: ink, height: 1.6)),
-          if (extra != null) ...[const SizedBox(height: 12), extra!],
         ],
       ),
     );
   }
-}
-
-class LegendItem extends StatelessWidget {
-  const LegendItem({super.key, required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 16,
-          height: 4,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(label, style: const TextStyle(color: ink)),
-      ],
-    );
-  }
-}
-
-/// One chart line: a value per month from month 0.
-typedef Series = ({String label, Color color, List<double> values});
-
-/// Value of [s] at [month]; past its end a series holds its last value.
-double valueAt(List<double> s, int month) => s[min(month, s.length - 1)];
-
-/// Line chart of monthly series sharing one EUR axis, with hover readout.
-class PlanChart extends StatefulWidget {
-  const PlanChart({super.key, required this.series});
-
-  final List<Series> series;
-
-  @override
-  State<PlanChart> createState() => _PlanChartState();
-}
-
-class _PlanChartState extends State<PlanChart> {
-  int? hover;
-
-  @override
-  Widget build(BuildContext context) {
-    final painter = _ChartPainter(widget.series, hover);
-    return SizedBox(
-      height: 280,
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final h = hover;
-          return MouseRegion(
-            onHover: (e) => setState(
-              () => hover = painter.monthAt(e.localPosition.dx, box.maxWidth),
-            ),
-            onExit: (_) => setState(() => hover = null),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CustomPaint(size: box.biggest, painter: painter),
-                if (h != null)
-                  Positioned(
-                    left: min(
-                      painter.xOf(h, box.maxWidth) + 12,
-                      box.maxWidth - 250,
-                    ),
-                    top: 0,
-                    child: _Tooltip(month: h, series: widget.series),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Tooltip extends StatelessWidget {
-  const _Tooltip({required this.month, required this.series});
-
-  final int month;
-  final List<Series> series;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 240,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: raised,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: const [BoxShadow(blurRadius: 8, color: Color(0x33000000))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            month == 0 ? 'Start' : 'After ${duration(month)}',
-            style: const TextStyle(color: ink, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          for (final s in series)
-            LegendItem(
-              color: s.color,
-              label: '${s.label} ${eur(valueAt(s.values, month))}',
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChartPainter extends CustomPainter {
-  _ChartPainter(this.series, this.hover);
-
-  final List<Series> series;
-  final int? hover;
-
-  static const left = 72.0, bottom = 28.0, top = 8.0, right = 16.0;
-
-  int get months => series.map((s) => s.values.length).reduce(max) - 1;
-  double get maxY => series.expand((s) => s.values).reduce(max);
-
-  double xOf(int month, double width) =>
-      left + (width - left - right) * month / months;
-
-  int monthAt(double x, double width) =>
-      ((x - left) / (width - left - right) * months).round().clamp(0, months);
-
-  double yOf(double v, Size size) =>
-      top + (size.height - top - bottom) * (1 - v / maxY);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final grid = Paint()
-      ..color = const Color(0xFF44474E)
-      ..strokeWidth = 1;
-    // Horizontal grid + EUR labels.
-    for (var i = 0; i <= 4; i++) {
-      final v = maxY * i / 4;
-      final y = yOf(v, size);
-      canvas.drawLine(Offset(left, y), Offset(size.width - right, y), grid);
-      _text(canvas, eur(v), Offset(left - 8, y), alignRight: true);
-    }
-    // Year ticks on the x axis.
-    final years = months / 12;
-    final step = max(1, (years / 8).ceil());
-    for (var yr = 0; yr <= years; yr += step) {
-      _text(
-        canvas,
-        yr == 0 ? 'Now' : '${yr}y',
-        Offset(xOf(yr * 12, size.width), size.height - bottom + 14),
-        center: true,
-      );
-    }
-
-    for (final s in series) {
-      _line(canvas, size, s.values, s.color);
-    }
-
-    final h = hover;
-    if (h != null) {
-      final x = xOf(h, size.width);
-      canvas.drawLine(
-        Offset(x, top),
-        Offset(x, size.height - bottom),
-        Paint()
-          ..color = muted
-          ..strokeWidth = 1,
-      );
-      for (final s in series) {
-        final p = Offset(x, yOf(valueAt(s.values, h), size));
-        canvas.drawCircle(p, 6, Paint()..color = panel);
-        canvas.drawCircle(p, 4.5, Paint()..color = s.color);
-      }
-    }
-  }
-
-  void _line(Canvas canvas, Size size, List<double> s, Color color) {
-    final path = Path()..moveTo(xOf(0, size.width), yOf(s[0], size));
-    for (var m = 1; m < s.length; m++) {
-      path.lineTo(xOf(m, size.width), yOf(s[m], size));
-    }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-  }
-
-  void _text(
-    Canvas canvas,
-    String s,
-    Offset at, {
-    bool alignRight = false,
-    bool center = false,
-  }) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: s,
-        style: const TextStyle(color: muted, fontSize: 12),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final dx = alignRight
-        ? at.dx - tp.width
-        : center
-        ? at.dx - tp.width / 2
-        : at.dx;
-    tp.paint(canvas, Offset(dx, at.dy - tp.height / 2));
-  }
-
-  @override
-  bool shouldRepaint(_ChartPainter old) =>
-      old.hover != hover || old.series != series;
 }
